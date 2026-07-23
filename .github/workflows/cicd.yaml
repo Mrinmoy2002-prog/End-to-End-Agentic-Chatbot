@@ -51,7 +51,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate Docker image settings
+      - name: Validate Docker image settings & set lowercased tags
+        id: prep
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
@@ -66,7 +67,13 @@ jobs:
             exit 1
           fi
 
-          echo "Docker image settings are configured."
+          # Docker requires lowercased repository and image names
+          LOWER_USER=$(echo "$DOCKER_USERNAME" | tr '[:upper:]' '[:lower:]')
+          LOWER_IMAGE=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
+
+          echo "DOCKER_USER_LOWER=$LOWER_USER" >> $GITHUB_ENV
+          echo "IMAGE_NAME_LOWER=$LOWER_IMAGE" >> $GITHUB_ENV
+          echo "Docker image settings configured: $LOWER_USER/$LOWER_IMAGE"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -84,8 +91,8 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:main
-            ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:sha-${{ github.sha }}
+            ${{ env.DOCKER_USER_LOWER }}/${{ env.IMAGE_NAME_LOWER }}:main
+            ${{ env.DOCKER_USER_LOWER }}/${{ env.IMAGE_NAME_LOWER }}:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -105,6 +112,12 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Format lowercased image variables
+        run: |
+          LOWER_USER=$(echo "${{ secrets.DOCKER_USERNAME }}" | tr '[:upper:]' '[:lower:]')
+          LOWER_IMAGE=$(echo "${{ secrets.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_PATH=${LOWER_USER}/${LOWER_IMAGE}" >> $GITHUB_ENV
+
       - name: Validate application secrets
         env:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
@@ -116,51 +129,18 @@ jobs:
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGSMITH_PROJECT: ${{ secrets.LANGSMITH_PROJECT }}
         run: |
-          if [ -z "$MISTRAL_API_KEY" ]; then
-            echo "MISTRAL_API_KEY secret is missing."
-            exit 1
-          fi
-
-          if [ -z "$HF_API_KEY" ]; then
-            echo "HF_API_KEY secret is missing."
-            exit 1
-          fi
-
-          if [ -z "$TAVILY_API_KEY" ]; then
-            echo "TAVILY_API_KEY secret is missing."
-            exit 1
-          fi
-
-          if [ -z "$OPENWEATHER_API_KEY" ]; then
-            echo "OPENWEATHER_API_KEY secret is missing."
-            exit 1
-          fi
-
-          if [ -z "$LANGSMITH_TRACING" ]; then
-            echo "LANGSMITH_TRACING secret is missing."
-            exit 1
-          fi
-
-          if [ -z "$LANGSMITH_ENDPOINT" ]; then
-            echo "LANGSMITH_ENDPOINT secret is missing."
-            exit 1
-          fi
-
-          if [ -z "$LANGSMITH_API_KEY" ]; then
-            echo "LANGSMITH_API_KEY secret is missing."
-            exit 1
-          fi
-
-          if [ -z "$LANGSMITH_PROJECT" ]; then
-            echo "LANGSMITH_PROJECT secret is missing."
-            exit 1
-          fi
+          if [ -z "$MISTRAL_API_KEY" ]; then echo "MISTRAL_API_KEY secret missing"; exit 1; fi
+          if [ -z "$HF_API_KEY" ]; then echo "HF_API_KEY secret missing"; exit 1; fi
+          if [ -z "$TAVILY_API_KEY" ]; then echo "TAVILY_API_KEY secret missing"; exit 1; fi
+          if [ -z "$OPENWEATHER_API_KEY" ]; then echo "OPENWEATHER_API_KEY secret missing"; exit 1; fi
+          if [ -z "$LANGSMITH_TRACING" ]; then echo "LANGSMITH_TRACING secret missing"; exit 1; fi
+          if [ -z "$LANGSMITH_ENDPOINT" ]; then echo "LANGSMITH_ENDPOINT secret missing"; exit 1; fi
+          if [ -z "$LANGSMITH_API_KEY" ]; then echo "LANGSMITH_API_KEY secret missing"; exit 1; fi
+          if [ -z "$LANGSMITH_PROJECT" ]; then echo "LANGSMITH_PROJECT secret missing"; exit 1; fi
 
           echo "All required application secrets are configured."
 
       - name: Pull latest Docker image
-        env:
-          IMAGE_PATH: ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}
         run: |
           docker pull "${IMAGE_PATH}:main"
 
@@ -170,13 +150,10 @@ jobs:
 
       - name: Run Streamlit container
         env:
-          IMAGE_PATH: ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}
-
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           HF_API_KEY: ${{ secrets.HF_API_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
-
           LANGSMITH_TRACING: ${{ secrets.LANGSMITH_TRACING }}
           LANGSMITH_ENDPOINT: ${{ secrets.LANGSMITH_ENDPOINT }}
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
@@ -187,8 +164,8 @@ jobs:
             --restart unless-stopped \
             --name stapp \
             -p 8501:8501 \
-            -e OPENAI_API_KEY \
-            -e GOOGLE_API_KEY \
+            -e MISTRAL_API_KEY \
+            -e HF_API_KEY \
             -e TAVILY_API_KEY \
             -e OPENWEATHER_API_KEY \
             -e LANGSMITH_TRACING \
