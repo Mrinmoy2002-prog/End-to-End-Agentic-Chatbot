@@ -1,6 +1,4 @@
 from langchain_core.prompts import PromptTemplate
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_mistralai import ChatMistralAI
 import os 
 from typing import Any
 from typing import TypedDict, Annotated
