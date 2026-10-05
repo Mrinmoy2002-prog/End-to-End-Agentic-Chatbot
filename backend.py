@@ -17,6 +17,7 @@ from langgraph.types import interrupt,Command
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import FastEmbedEmbeddings
 import requests
 from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
@@ -37,7 +38,8 @@ llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0)
 
 
 # Embeddings model
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+# embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+embeddings = FastEmbedEmbeddings()
 
 
 
